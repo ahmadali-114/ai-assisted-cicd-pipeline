@@ -39,6 +39,16 @@ pipeline {
             }
         }
 
+        stage('Scan Docker Image') {
+            steps {
+                sh '''
+                    trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --no-progress --format table --output trivy-image-report.txt ${IMAGE_NAME}:${IMAGE_TAG}
+                    cat trivy-image-report.txt
+                '''
+                archiveArtifacts artifacts: 'trivy-image-report.txt', fingerprint: true
+            }
+        }
+
         stage('Deploy to Staging') {
             steps {
                 sh '''
