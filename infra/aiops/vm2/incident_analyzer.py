@@ -13,6 +13,8 @@ from mcp import Client
 OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
 MODEL = os.environ.get("AIOPS_OLLAMA_MODEL", "qwen2.5:1.5b")
 MCP_URL = os.environ.get("AIOPS_MCP_URL", "http://127.0.0.1:8001/mcp")
+OLLAMA_TIMEOUT_SECONDS = int(os.environ.get("AIOPS_OLLAMA_TIMEOUT_SECONDS", "420"))
+MAX_RESPONSE_TOKENS = int(os.environ.get("AIOPS_MAX_RESPONSE_TOKENS", "300"))
 
 
 async def get_snapshot_via_mcp() -> str:
@@ -71,14 +73,24 @@ DIAGNOSTIC SNAPSHOT START
 DIAGNOSTIC SNAPSHOT END
 """
     payload = json.dumps(
-        {"model": MODEL, "prompt": prompt, "stream": False, "options": {"temperature": 0}}
+        {
+            "model": MODEL,
+            "prompt": prompt,
+            "stream": False,
+            "keep_alive": "10m",
+            "options": {"temperature": 0, "num_predict": MAX_RESPONSE_TOKENS},
+        }
     ).encode()
     request = Request(OLLAMA_URL, data=payload, headers={"Content-Type": "application/json"})
     try:
-        with urlopen(request, timeout=180) as response:
+        with urlopen(request, timeout=OLLAMA_TIMEOUT_SECONDS) as response:
             body = json.loads(response.read().decode())
     except URLError as error:
         raise RuntimeError(f"Local Ollama API is unavailable: {error.reason}") from error
+    except TimeoutError as error:
+        raise RuntimeError(
+            f"Local Ollama API exceeded its {OLLAMA_TIMEOUT_SECONDS}-second response budget"
+        ) from error
     return (
         f"AUTOMATED CURRENT-STATE VERDICT: {verdict}\n"
         f"AUTOMATED EVIDENCE: {deterministic_evidence}\n\n"
