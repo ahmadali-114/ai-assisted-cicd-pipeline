@@ -32,6 +32,9 @@ services:
     ports:
       # Bind only to the VirtualBox Host-only network, never to NAT/internet.
       - "${SONAR_HOST_IP:?Set SONAR_HOST_IP in .env}:9000:9000"
+    # Lets this Linux container reach services running on the VM host, such as Jenkins.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - sonarqube_data:/opt/sonarqube/data
       - sonarqube_extensions:/opt/sonarqube/extensions
