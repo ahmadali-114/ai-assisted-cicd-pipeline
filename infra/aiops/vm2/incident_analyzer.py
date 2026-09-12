@@ -14,7 +14,9 @@ MODEL = os.environ.get("AIOPS_OLLAMA_MODEL", "qwen2.5:1.5b")
 
 
 def analyze(snapshot: str) -> str:
-    prompt = f"""You are a cautious DevOps incident assistant.
+    prompt = f"""You are a cautious DevOps incident assistant for an authorized learning lab.
+The user explicitly authorizes analysis of this bounded and redacted diagnostic snapshot.
+Do the diagnosis; do not refuse merely because the data contains operational logs.
 Use only the diagnostic evidence below. Do not invent facts, failures, credentials,
 or missing files. A historical Jenkins start/stop message is not an active incident
 when the current service status is active and healthy.
@@ -30,7 +32,9 @@ DIAGNOSTIC SNAPSHOT START
 {snapshot}
 DIAGNOSTIC SNAPSHOT END
 """
-    payload = json.dumps({"model": MODEL, "prompt": prompt, "stream": False}).encode()
+    payload = json.dumps(
+        {"model": MODEL, "prompt": prompt, "stream": False, "options": {"temperature": 0}}
+    ).encode()
     request = Request(OLLAMA_URL, data=payload, headers={"Content-Type": "application/json"})
     try:
         with urlopen(request, timeout=180) as response:
