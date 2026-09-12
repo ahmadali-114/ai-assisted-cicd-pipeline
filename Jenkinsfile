@@ -9,6 +9,7 @@ pipeline {
     environment {
         IMAGE_NAME = 'system-monitor-api'
         IMAGE_TAG = "build-${BUILD_NUMBER}"
+        DOCKERHUB_REPOSITORY = 'ahmadalimalik/system-monitor-api'
     }
 
     stages {
@@ -55,6 +56,23 @@ pipeline {
                     if (scanStatus != 0) {
                         error 'Security gate failed: Trivy found HIGH or CRITICAL vulnerabilities with available fixes.'
                     }
+                }
+            }
+        }
+
+        stage('Push Image to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKERHUB_USERNAME',
+                    passwordVariable: 'DOCKERHUB_TOKEN'
+                )]) {
+                    sh '''
+                        echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+                        docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKERHUB_REPOSITORY}:${IMAGE_TAG}
+                        docker push ${DOCKERHUB_REPOSITORY}:${IMAGE_TAG}
+                        docker logout
+                    '''
                 }
             }
         }
