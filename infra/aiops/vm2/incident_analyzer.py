@@ -31,6 +31,24 @@ async def get_snapshot_via_mcp() -> str:
 
 def current_state_assessment(snapshot: str) -> tuple[str, str]:
     """Keep the current-state verdict deterministic instead of trusting an LLM."""
+    active_incident_signals = (
+        "jenkins=inactive",
+        "jenkins=failed",
+        "docker=inactive",
+        "docker=failed",
+        "system-monitor-api container not found",
+        "curl: (7)",
+        "curl: (22)",
+        "(unhealthy)",
+    )
+    detected_failures = [signal for signal in active_incident_signals if signal in snapshot]
+    if detected_failures:
+        return (
+            "ACTIVE INCIDENT",
+            "Current diagnostic snapshot contains failure signals: "
+            + ", ".join(detected_failures),
+        )
+
     required_signals = (
         "jenkins=active",
         "docker=active",
