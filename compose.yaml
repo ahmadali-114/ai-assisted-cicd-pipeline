@@ -2,7 +2,9 @@ services:
   system-monitor-api:
     build:
       context: .
-    image: system-monitor-api:${IMAGE_TAG:-local}
+    # Locally this builds system-monitor-api:local. Jenkins overrides both
+    # variables to pull a specific approved image from Docker Hub.
+    image: ${IMAGE_REPOSITORY:-system-monitor-api}:${IMAGE_TAG:-local}
     container_name: system-monitor-api
     environment:
       APP_NAME: ${APP_NAME:-System Health & Service Monitoring API}

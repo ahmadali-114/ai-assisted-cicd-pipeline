@@ -80,8 +80,9 @@ pipeline {
         stage('Deploy to Staging') {
             steps {
                 sh '''
-                    IMAGE_TAG=${IMAGE_TAG} APP_VERSION=${IMAGE_TAG} docker compose up --detach --no-build --force-recreate
-                    docker compose ps
+                    IMAGE_REPOSITORY=${DOCKERHUB_REPOSITORY} IMAGE_TAG=${IMAGE_TAG} docker compose pull
+                    IMAGE_REPOSITORY=${DOCKERHUB_REPOSITORY} IMAGE_TAG=${IMAGE_TAG} APP_VERSION=${IMAGE_TAG} docker compose up --detach --no-build --force-recreate
+                    IMAGE_REPOSITORY=${DOCKERHUB_REPOSITORY} IMAGE_TAG=${IMAGE_TAG} docker compose ps
                 '''
             }
         }
