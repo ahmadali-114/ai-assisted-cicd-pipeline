@@ -1,0 +1,20 @@
+[Unit]
+Description=AI Operations MCP Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=test
+Group=test
+WorkingDirectory=/home/test/projects/ai-assisted-cicd-pipeline/infra/aiops/vm2
+Environment=HOME=/home/test
+ExecStart=/home/test/projects/ai-assisted-cicd-pipeline/.venv/bin/python /home/test/projects/ai-assisted-cicd-pipeline/infra/aiops/vm2/aiops_mcp_server.py --http
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

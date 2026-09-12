@@ -2,15 +2,29 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from vm1_snapshot import get_vm1_snapshot
+from mcp import Client
 
 OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
 MODEL = os.environ.get("AIOPS_OLLAMA_MODEL", "qwen2.5:1.5b")
+MCP_URL = os.environ.get("AIOPS_MCP_URL", "http://127.0.0.1:8001/mcp")
+
+
+async def get_snapshot_via_mcp() -> str:
+    """Retrieve diagnostics through the local MCP tool, not a direct SSH call."""
+    async with Client(MCP_URL) as client:
+        result = await client.call_tool("get_vm1_diagnostic_snapshot", {})
+
+    text_parts = [item.text for item in result.content if hasattr(item, "text")]
+    snapshot = "\n".join(text_parts)
+    if not snapshot:
+        raise RuntimeError("MCP tool returned no text diagnostic snapshot")
+    return snapshot
 
 
 def current_state_assessment(snapshot: str) -> tuple[str, str]:
@@ -74,4 +88,4 @@ DIAGNOSTIC SNAPSHOT END
 
 
 if __name__ == "__main__":
-    print(analyze(get_vm1_snapshot()))
+    print(analyze(asyncio.run(get_snapshot_via_mcp())))
