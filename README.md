@@ -1,135 +1,165 @@
-# System Health & Service Monitoring API
+# AI-Assisted CI/CD Pipeline for a FastAPI Service
 
-A small FastAPI service used as the application workload for the **AI-Assisted CI/CD Pipeline** portfolio project. The application is intentionally simple: the learning focus is Docker, testing, CI/CD, secure deployments, health checks, rollback, and later AI-assisted incident analysis.
+A production-minded DevSecOps lab that builds, scans, publishes, deploys, verifies, and troubleshoots a small FastAPI service. The application is deliberately simple; the project focus is the delivery and operations workflow around it.
 
-## Features
+## What problem does this solve?
 
-- Liveness endpoint: `GET /health`
-- Readiness endpoint: `GET /ready`
-- Service metadata and runtime status endpoints
-- Automated endpoint tests with pytest
-- Environment-based configuration
-- Production-minded Docker image that runs as a non-root user
+A deployment is not complete merely because a container starts. A reliable delivery system must verify code quality, image security, deployment health, and recovery behaviour. When an incident happens, an AI assistant must receive only approved diagnostic evidence—not unrestricted server access.
 
-## Technology stack
+This project demonstrates that workflow from commit to verified staging recovery.
 
-- Python 3.11+ (Docker uses Python 3.12)
-- FastAPI and Uvicorn
-- Pydantic response models
-- pytest and httpx
-- Docker and Docker Compose
-
-## Project structure
+## Architecture
 
 ```text
-app/
-├── __init__.py
-├── config.py          # Environment-based settings
-└── main.py            # FastAPI endpoints
-tests/
-├── __init__.py
-└── test_health.py     # Endpoint tests
-.dockerignore
-.env.example
-.gitignore
-compose.yaml
-Dockerfile
-requirements.txt
-requirements-dev.txt
+Windows development host
+        |
+        | git push
+        v
+GitHub repository
+        |
+        | Jenkins polls main every five minutes
+        v
+VM1: Ubuntu staging and CI/CD server (private host-only network)
+  Jenkins -> pytest -> SonarQube Quality Gate -> Docker build -> Trivy
+          -> Docker Hub -> health-checked staging deployment / rollback
+        ^
+        | restricted SSH snapshot only
+        |
+VM2: CentOS AI operations server
+  local Ollama + localhost-only MCP service -> evidence-based AI advisory report
 ```
 
-## Local installation
+The application, Jenkins, SonarQube, and AI operations service are all lab services on isolated VirtualBox VMs. The local AI API and MCP endpoint are not exposed to the network.
 
-Windows PowerShell:
+## CI/CD flow
 
-```powershell
-py -3 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements-dev.txt
+```text
+Commit to main
+  -> Jenkins checkout
+  -> pytest + JUnit + coverage artifact
+  -> SonarQube analysis
+  -> SonarQube Quality Gate webhook
+  -> hardened Docker image build
+  -> Trivy HIGH/CRITICAL vulnerability gate
+  -> versioned image push to Docker Hub
+  -> staging deployment
+  -> HTTP health-check retries
+  -> persist last healthy release or roll back on failure
 ```
 
-Ubuntu:
+The pipeline definition is in [Jenkinsfile](Jenkinsfile). The deployment and rollback logic is in [scripts/deploy-staging.sh](scripts/deploy-staging.sh).
+
+## Application workload
+
+The workload is a FastAPI **System Health & Service Monitoring API** with:
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /health` | Liveness health check |
+| `GET /ready` | Readiness health check |
+| `GET /info` | Non-sensitive service information |
+| `GET /api/v1/status` | Runtime status information |
+
+The production Docker image uses a multi-stage build, runs as a non-root user, includes a container health check, and removes build-time package tooling from the runtime image.
+
+## DevSecOps controls
+
+| Control | Implementation |
+| --- | --- |
+| Automated tests | `pytest`, JUnit XML, and coverage artifact in Jenkins |
+| Code quality | Local SonarQube analysis and blocking Quality Gate |
+| Image security | Trivy fails the pipeline on fixable HIGH or CRITICAL findings |
+| Immutable release identity | Docker image tag is `build-<Jenkins build number>` |
+| Registry verification | Staging pulls the Docker Hub image, rather than using the locally built image |
+| Safe deployment | Health checks retry before the release is accepted |
+| Rollback | The last healthy image repository and tag are persisted for rollback |
+| Concurrency protection | Jenkins disables concurrent deployments |
+| Secrets | Docker Hub and SonarQube credentials remain in Jenkins, not Git |
+
+## AI-assisted operations design
+
+AI is used for **read-only incident explanation and troubleshooting suggestions**, not for autonomous production changes.
+
+```text
+Ollama incident analyzer
+  -> MCP client
+  -> MCP service bound to 127.0.0.1:8001 only
+  -> dedicated VM1 SSH key
+  -> aiops-reader account
+  -> one root-owned, argument-free diagnostic snapshot command
+```
+
+The MCP service exposes one tool: `get_vm1_diagnostic_snapshot`.
+
+The VM1 `aiops-reader` account is intentionally not a member of `sudo` or `docker` groups. Its only allowed privileged action is a fixed, no-argument diagnostic command that returns bounded service status and recent, redacted logs. The corresponding source is in [infra/aiops](infra/aiops).
+
+The analyzer has two outputs:
+
+1. **Automated current-state verdict** — deterministic health signals decide `ACTIVE INCIDENT`, `NO ACTIVE INCIDENT`, or `INSUFFICIENT EVIDENCE`.
+2. **AI advisory analysis** — local Ollama summarizes the approved evidence and proposes safe, read-only follow-up commands.
+
+This separation is deliberate: small local models can over-focus on historical warnings. The AI report is never treated as the source of truth.
+
+## Lab validation evidence
+
+The following scenarios were completed in the lab:
+
+- `pytest -q` passed all five API tests.
+- Jenkins completed tests, SonarQube Quality Gate, Trivy scan, Docker Hub push, and staging deployment successfully.
+- A SonarQube webhook connectivity timeout was diagnosed from logs and corrected using a localhost Docker host-gateway mapping plus a restricted firewall rule.
+- A Trivy finding from a pip-vendored dependency was eliminated by changing the Dockerfile to a smaller multi-stage runtime image.
+- A deliberately unhealthy deployment triggered the deployment script's rollback to the last healthy image.
+- A controlled `docker stop system-monitor-api` incident produced `ACTIVE INCIDENT`; after recovery, the deterministic result returned `NO ACTIVE INCIDENT`.
+- A real MCP smoke test successfully called the local MCP server and retrieved the approved VM1 diagnostic snapshot.
+- SELinux denied a systemd service running Python from a user home directory; the service was corrected to run from `/opt/aiops` with SELinux still enforcing.
+
+## Repository layout
+
+```text
+app/                         FastAPI application
+tests/                       pytest tests
+Dockerfile                   Hardened multi-stage container image
+compose.yaml                 Application deployment definition
+Jenkinsfile                  Jenkins declarative pipeline
+scripts/deploy-staging.sh    Deploy, health-check, and rollback logic
+infra/sonarqube/             Local SonarQube and PostgreSQL stack
+infra/aiops/                 Restricted diagnostics, MCP server, and AI analyzer
+```
+
+## Run the application locally
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate              # Windows: .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r requirements-dev.txt
+pytest -q
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Copy `.env.example` to `.env` only if you need to override the default local configuration. Never commit `.env`.
+Open Swagger UI at [http://localhost:8000/docs](http://localhost:8000/docs).
 
-## Run locally
-
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Open Swagger documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
-
-## Run tests
-
-```bash
-pytest
-```
-
-## Run with Docker
-
-Build the image:
-
-```bash
-docker build -t system-monitor-api:local .
-```
-
-Run a container:
-
-```bash
-docker run --rm -p 8000:8000 --name system-monitor-api system-monitor-api:local
-```
-
-Or use Docker Compose:
+To run with Docker:
 
 ```bash
 docker compose up --build
+curl http://127.0.0.1:8000/health
 ```
 
-Stop the Compose stack:
+## Important security notes
 
-```bash
-docker compose down
-```
+- Do not commit `.env` files, Docker Hub tokens, SonarQube tokens, SSH private keys, or generated service state.
+- Keep Ollama (`11434`) and MCP (`8001`) bound to loopback only.
+- Do not add the AI operations account to the `docker` or `sudo` group.
+- Validate AI recommendations against deterministic health checks and logs before making a change.
 
-## API endpoints
+## Resume-ready summary
 
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| GET | `/` | Application summary |
-| GET | `/health` | Liveness health check |
-| GET | `/ready` | Readiness health check |
-| GET | `/info` | Non-sensitive service information |
-| GET | `/api/v1/status` | Runtime status information |
+Built an AI-assisted DevSecOps CI/CD pipeline for a containerized FastAPI service using Jenkins, Docker, Docker Hub, SonarQube, Trivy, and local Ollama. Implemented health-checked deployments with rollback, a blocking security and quality gate, and a least-privilege MCP diagnostic service that provides evidence-based incident analysis without granting AI unrestricted server access.
 
-## Example requests
+## Future improvements
 
-```bash
-curl http://localhost:8000/
-curl http://localhost:8000/health
-curl http://localhost:8000/ready
-curl http://localhost:8000/info
-curl http://localhost:8000/api/v1/status
-```
-
-Example health response:
-
-```json
-{
-  "name": "System Health & Service Monitoring API",
-  "version": "1.0.0",
-  "status": "healthy"
-}
-```
-
-## Future DevOps integration
-
-This application will later be connected to GitHub Actions. The planned pipeline will run tests, SonarQube/SonarCloud analysis, Trivy image scanning, Docker image builds, image-registry publishing, and staging deployment to VM1. A later VM2 component will use a local AI model with restricted MCP tools to analyze sanitized CI/CD and application logs. It will not receive unrestricted server access.
+- Add Prometheus and Grafana metrics and dashboards.
+- Add alert routing for failed deployment and health-check events.
+- Add a separate production environment with manual approval gates.
+- Add integration tests and dependency update automation.
