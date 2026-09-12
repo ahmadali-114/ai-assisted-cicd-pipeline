@@ -79,29 +79,7 @@ pipeline {
 
         stage('Deploy to Staging') {
             steps {
-                sh '''
-                    IMAGE_REPOSITORY=${DOCKERHUB_REPOSITORY} IMAGE_TAG=${IMAGE_TAG} docker compose pull
-                    IMAGE_REPOSITORY=${DOCKERHUB_REPOSITORY} IMAGE_TAG=${IMAGE_TAG} APP_VERSION=${IMAGE_TAG} docker compose up --detach --no-build --force-recreate
-                    IMAGE_REPOSITORY=${DOCKERHUB_REPOSITORY} IMAGE_TAG=${IMAGE_TAG} docker compose ps
-                '''
-            }
-        }
-
-        stage('Verify Health') {
-            steps {
-                sh '''
-                    for attempt in 1 2 3 4 5 6 7 8 9 10; do
-                        if curl --fail --silent --show-error http://127.0.0.1:8000/health; then
-                            exit 0
-                        fi
-                        echo "Health check attempt ${attempt}/10 failed; retrying in 3 seconds."
-                        sleep 3
-                    done
-
-                    echo 'Deployment failed: the service did not become healthy.'
-                    docker compose logs --no-color
-                    exit 1
-                '''
+                sh 'IMAGE_REPOSITORY=${DOCKERHUB_REPOSITORY} IMAGE_TAG=${IMAGE_TAG} bash ./scripts/deploy-staging.sh'
             }
         }
     }
