@@ -29,9 +29,14 @@ printf 'jenkins='
 systemctl is-active jenkins || true
 printf 'docker='
 systemctl is-active docker || true
+systemctl show jenkins --no-pager \
+  --property=ActiveState --property=SubState --property=ExecMainStatus
 
 section "CONTAINERS"
 docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' | redact
+
+section "APPLICATION HEALTH"
+curl --fail --silent --show-error --max-time 3 http://127.0.0.1:8000/health 2>&1 | redact || true
 
 section "APPLICATION LOGS (LAST 150 LINES)"
 if docker ps -a --format '{{.Names}}' | grep -Fxq 'system-monitor-api'; then
@@ -40,5 +45,5 @@ else
   echo 'system-monitor-api container not found'
 fi
 
-section "JENKINS LOGS (LAST 150 LINES)"
-journalctl --no-pager -u jenkins -n 150 2>&1 | redact
+section "JENKINS LOGS (LAST 100 LINES)"
+journalctl --no-pager -u jenkins -n 100 2>&1 | redact

@@ -15,9 +15,16 @@ MODEL = os.environ.get("AIOPS_OLLAMA_MODEL", "qwen2.5:1.5b")
 
 def analyze(snapshot: str) -> str:
     prompt = f"""You are a cautious DevOps incident assistant.
-Use only the diagnostic evidence below. Do not invent facts or credentials.
-Return these sections: Incident summary; Evidence; Most likely cause with confidence;
-Safe next troubleshooting commands. If evidence is insufficient, say so clearly.
+Use only the diagnostic evidence below. Do not invent facts, failures, credentials,
+or missing files. A historical Jenkins start/stop message is not an active incident
+when the current service status is active and healthy.
+
+Start with exactly one verdict: ACTIVE INCIDENT, NO ACTIVE INCIDENT, or
+INSUFFICIENT EVIDENCE. You may select ACTIVE INCIDENT only when the snapshot
+contains a current unhealthy/inactive state, an explicit error, or a failed command.
+Then return: Evidence (quote exact snapshot facts); Most likely cause with confidence;
+Safe read-only next troubleshooting commands. Never recommend downloading or replacing
+Jenkins files unless the snapshot explicitly proves they are missing or corrupted.
 
 DIAGNOSTIC SNAPSHOT START
 {snapshot}
