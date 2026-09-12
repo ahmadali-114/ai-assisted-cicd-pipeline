@@ -1,0 +1,47 @@
+name: sonarqube
+
+services:
+  database:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD:?Set SONAR_DB_PASSWORD in .env}
+      POSTGRES_DB: sonar
+    volumes:
+      - sonarqube_database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar -d sonar"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  sonarqube:
+    image: sonarqube:25.6.0.109173-community
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://database:5432/sonar
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD:?Set SONAR_DB_PASSWORD in .env}
+      # Conservative JVM heaps for this single-VM learning lab.
+      SONAR_WEB_JAVAOPTS: -Xms256m -Xmx512m
+      SONAR_CE_JAVAOPTS: -Xms256m -Xmx512m
+      SONAR_SEARCH_JAVAOPTS: -Xms512m -Xmx512m
+    ports:
+      # Bind only to the VirtualBox Host-only network, never to NAT/internet.
+      - "${SONAR_HOST_IP:?Set SONAR_HOST_IP in .env}:9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_temp:/opt/sonarqube/temp
+    restart: unless-stopped
+
+volumes:
+  sonarqube_database:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+  sonarqube_temp:
