@@ -13,7 +13,30 @@ OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
 MODEL = os.environ.get("AIOPS_OLLAMA_MODEL", "qwen2.5:1.5b")
 
 
+def current_state_assessment(snapshot: str) -> tuple[str, str]:
+    """Keep the current-state verdict deterministic instead of trusting an LLM."""
+    required_signals = (
+        "jenkins=active",
+        "docker=active",
+        '"status":"healthy"',
+        "system-monitor-api",
+        "(healthy)",
+    )
+    missing_signals = [signal for signal in required_signals if signal not in snapshot]
+    if not missing_signals:
+        return (
+            "NO ACTIVE INCIDENT",
+            "Jenkins and Docker are active; the deployed API and its container health check are healthy.",
+        )
+    return (
+        "INSUFFICIENT EVIDENCE",
+        "Current health cannot be confirmed because these expected signals were absent: "
+        + ", ".join(missing_signals),
+    )
+
+
 def analyze(snapshot: str) -> str:
+    verdict, deterministic_evidence = current_state_assessment(snapshot)
     prompt = f"""You are a cautious DevOps incident assistant for an authorized learning lab.
 The user explicitly authorizes analysis of this bounded and redacted diagnostic snapshot.
 Do the diagnosis; do not refuse merely because the data contains operational logs.
@@ -21,12 +44,13 @@ Use only the diagnostic evidence below. Do not invent facts, failures, credentia
 or missing files. A historical Jenkins start/stop message is not an active incident
 when the current service status is active and healthy.
 
-Start with exactly one verdict: ACTIVE INCIDENT, NO ACTIVE INCIDENT, or
-INSUFFICIENT EVIDENCE. You may select ACTIVE INCIDENT only when the snapshot
-contains a current unhealthy/inactive state, an explicit error, or a failed command.
-Then return: Evidence (quote exact snapshot facts); Most likely cause with confidence;
-Safe read-only next troubleshooting commands. Never recommend downloading or replacing
-Jenkins files unless the snapshot explicitly proves they are missing or corrupted.
+The deterministic current-state verdict is: {verdict}.
+Its evidence is: {deterministic_evidence}
+Do not override this verdict. Historical log errors must be labelled historical and must
+not be presented as a current outage. Return: Historical observations; Evidence (quote
+exact snapshot facts); Safe read-only next troubleshooting commands. Never recommend
+downloading or replacing Jenkins files unless the snapshot explicitly proves they are
+missing or corrupted.
 
 DIAGNOSTIC SNAPSHOT START
 {snapshot}
@@ -41,7 +65,12 @@ DIAGNOSTIC SNAPSHOT END
             body = json.loads(response.read().decode())
     except URLError as error:
         raise RuntimeError(f"Local Ollama API is unavailable: {error.reason}") from error
-    return body["response"].strip()
+    return (
+        f"AUTOMATED CURRENT-STATE VERDICT: {verdict}\n"
+        f"AUTOMATED EVIDENCE: {deterministic_evidence}\n\n"
+        "AI ADVISORY ANALYSIS (validate before making changes):\n"
+        + body["response"].strip()
+    )
 
 
 if __name__ == "__main__":
