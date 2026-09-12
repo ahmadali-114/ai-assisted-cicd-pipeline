@@ -6,6 +6,12 @@ pipeline {
         disableConcurrentBuilds()
     }
 
+    triggers {
+        // VM1 is private, so GitHub cannot send a public webhook to it.
+        // Polling makes Jenkins check GitHub for new commits every five minutes.
+        pollSCM('H/5 * * * *')
+    }
+
     environment {
         IMAGE_NAME = 'system-monitor-api'
         IMAGE_TAG = "build-${BUILD_NUMBER}"
