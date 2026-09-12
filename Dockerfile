@@ -1,4 +1,19 @@
-# A small official Python runtime suitable for a containerized API.
+# Stage 1: install runtime dependencies outside the final application image.
+FROM python:3.12-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /build
+
+COPY requirements.txt .
+
+# --prefix keeps dependencies in /install, ready to copy into the runtime image.
+RUN python -m pip install --no-cache-dir --upgrade pip \
+    && python -m pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+
+# Stage 2: small runtime image with no package-management tooling.
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -6,11 +21,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Copy dependency metadata first so Docker can reuse this cached layer when
-# only application source code changes.
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+# Copy only FastAPI/Uvicorn runtime dependencies from the builder stage.
+COPY --from=builder /install /usr/local
+
+# pip is required while building an image but not to run this API. Removing it
+# avoids shipping pip's vulnerable vendored packages in the runtime container.
+RUN rm -rf \
+    /usr/local/bin/pip \
+    /usr/local/bin/pip3 \
+    /usr/local/bin/pip3.12 \
+    /usr/local/lib/python3.12/ensurepip \
+    /usr/local/lib/python3.12/site-packages/pip \
+    /usr/local/lib/python3.12/site-packages/pip-*.dist-info \
+    /usr/local/lib/python3.12/site-packages/setuptools \
+    /usr/local/lib/python3.12/site-packages/setuptools-*.dist-info
 
 # Run the service as a dedicated non-root user.
 RUN groupadd --system appgroup \
