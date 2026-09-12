@@ -32,8 +32,29 @@ pipeline {
                     . .venv/bin/activate
                     python -m pip install --upgrade pip
                     pip install -r requirements-dev.txt
-                    pytest -q
+                    pytest -q --junitxml=test-results.xml --cov=app --cov-report=xml:coverage.xml
                 '''
+                junit 'test-results.xml'
+                archiveArtifacts artifacts: 'coverage.xml', fingerprint: true
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube-Local') {
+                    script {
+                        def scannerHome = tool 'SonarScanner'
+                        sh "${scannerHome}/bin/sonar-scanner"
+                    }
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
             }
         }
 
