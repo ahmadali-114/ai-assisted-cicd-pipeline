@@ -41,11 +41,21 @@ pipeline {
 
         stage('Scan Docker Image') {
             steps {
-                sh '''
-                    trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --no-progress --format table --output trivy-image-report.txt ${IMAGE_NAME}:${IMAGE_TAG}
-                    cat trivy-image-report.txt
-                '''
-                archiveArtifacts artifacts: 'trivy-image-report.txt', fingerprint: true
+                script {
+                    int scanStatus = sh(
+                        returnStatus: true,
+                        script: '''
+                            trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --no-progress --exit-code 1 --format table --output trivy-image-report.txt ${IMAGE_NAME}:${IMAGE_TAG}
+                            cat trivy-image-report.txt
+                        '''
+                    )
+
+                    archiveArtifacts artifacts: 'trivy-image-report.txt', fingerprint: true
+
+                    if (scanStatus != 0) {
+                        error 'Security gate failed: Trivy found HIGH or CRITICAL vulnerabilities with available fixes.'
+                    }
+                }
             }
         }
 
