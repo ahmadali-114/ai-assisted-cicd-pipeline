@@ -11,6 +11,9 @@ VM1_USER = os.environ.get("AIOPS_VM1_USER", "aiops-reader")
 SSH_KEY = Path(
     os.environ.get("AIOPS_SSH_KEY", "~/.ssh/aiops_vm1_ed25519")
 ).expanduser()
+KNOWN_HOSTS_FILE = Path(
+    os.environ.get("AIOPS_KNOWN_HOSTS", "~/.ssh/known_hosts")
+).expanduser()
 MAX_SNAPSHOT_CHARS = 12_000
 
 
@@ -18,6 +21,8 @@ def get_vm1_snapshot() -> str:
     """Run VM1's single approved read-only diagnostic command over SSH."""
     if not SSH_KEY.is_file():
         raise RuntimeError(f"AI operations SSH key was not found: {SSH_KEY}")
+    if not KNOWN_HOSTS_FILE.is_file():
+        raise RuntimeError(f"VM1 SSH known-hosts file was not found: {KNOWN_HOSTS_FILE}")
 
     command = [
         "ssh",
@@ -29,6 +34,10 @@ def get_vm1_snapshot() -> str:
         "IdentitiesOnly=yes",
         "-o",
         "ConnectTimeout=10",
+        "-o",
+        f"UserKnownHostsFile={KNOWN_HOSTS_FILE}",
+        "-o",
+        "StrictHostKeyChecking=yes",
         f"{VM1_USER}@{VM1_HOST}",
         "sudo -n /usr/local/sbin/aiops-diagnostics",
     ]

@@ -7,13 +7,17 @@ Wants=network-online.target
 Type=simple
 User=test
 Group=test
-WorkingDirectory=/home/test/projects/ai-assisted-cicd-pipeline/infra/aiops/vm2
-Environment=HOME=/home/test
-ExecStart=/home/test/projects/ai-assisted-cicd-pipeline/.venv/bin/python /home/test/projects/ai-assisted-cicd-pipeline/infra/aiops/vm2/aiops_mcp_server.py --http
+WorkingDirectory=/opt/aiops/vm2
+Environment=HOME=/nonexistent
+Environment=AIOPS_SSH_KEY=/etc/aiops/aiops_vm1_ed25519
+Environment=AIOPS_KNOWN_HOSTS=/etc/aiops/known_hosts
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/aiops/venv/bin/python /opt/aiops/vm2/aiops_mcp_server.py --http
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
+ProtectHome=true
 ProtectSystem=full
 
 [Install]
