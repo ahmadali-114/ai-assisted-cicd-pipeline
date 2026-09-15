@@ -24,9 +24,14 @@ WORKDIR /app
 # Copy only FastAPI/Uvicorn runtime dependencies from the builder stage.
 COPY --from=builder /install /usr/local
 
+# Apply Debian security fixes available at build time. Trivy blocks releases
+# when a fixable HIGH or CRITICAL operating-system package is present.
 # pip is required while building an image but not to run this API. Removing it
 # avoids shipping pip's vulnerable vendored packages in the runtime container.
-RUN rm -rf \
+RUN apt-get update \
+    && apt-get upgrade --yes \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf \
     /usr/local/bin/pip \
     /usr/local/bin/pip3 \
     /usr/local/bin/pip3.12 \
