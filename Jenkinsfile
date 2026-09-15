@@ -73,8 +73,13 @@ pipeline {
                     int scanStatus = sh(
                         returnStatus: true,
                         script: '''
+                            # Keep the report visible even when Trivy returns 1 for a blocked image.
+                            set +e
                             trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --no-progress --exit-code 1 --format table --output trivy-image-report.txt ${IMAGE_NAME}:${IMAGE_TAG}
+                            scan_status=$?
+                            set -e
                             cat trivy-image-report.txt
+                            exit "$scan_status"
                         '''
                     )
 
