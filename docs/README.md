@@ -2,6 +2,8 @@
 
 This document records the complete implementation of the **AI-Assisted CI/CD Pipeline for a FastAPI Service**. It is written as a portfolio case study and an operational runbook for rebuilding the lab.
 
+For architecture diagrams, component responsibilities, data flows, trust boundaries, and failure handling, see [System Design](SYSTEM_DESIGN.md).
+
 ## 1. Project goal
 
 The goal is not only to deploy a web application. The goal is to build a delivery workflow that answers real DevOps questions:
